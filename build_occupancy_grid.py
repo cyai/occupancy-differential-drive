@@ -11,6 +11,7 @@ class OccupancyGrid:
         self.p_occupied = p_occupied
         self.grid = np.zeros((grid_size**2, len(state_directions) + 1))
         self.l_0 = 0
+        self.pm = np.full((self.grid_size**2,), 0.5)
 
     def calculate_log_odds_free(self, p_free: float) -> float:
         """Calculates log-odds for free cells."""
@@ -94,11 +95,14 @@ class OccupancyGrid:
             self.grid[:, t] = li
 
     def update_individual_grid_column(
-        self, t: int, state: tuple, direction: str, range_: int
+        self, t: int, state: tuple, direction: str, range_: int, initial: bool = False
     ) -> None:
         """Updates individual grid column."""
         row, col = state
-        previous_li = self.grid[:, t - 1]
+        if initial:
+            previous_li = [0] * self.grid_size**2
+        else:
+            previous_li = self.grid[:, t - 1]
         state_index = self.grid_col_row_to_index(row, col)
         li = self.calculate_li(state_index, direction, range_, previous_li, t - 1)
         print(
@@ -110,15 +114,30 @@ class OccupancyGrid:
 
         self.grid[:, t] = li
 
+    def calculate_pm(self) -> float:
+        last_column = self.grid[:, -2]
+        for i in range(self.grid_size**2):
+            self.pm[i] = (
+                np.exp(last_column[i]) / (1 + np.exp(last_column[i]))
+                if last_column[i] != 0
+                else 0.5
+            )
+
+        return self.pm
+
     def display_grid(self):
         """Displays the grid map using PrettyTable."""
         table = PrettyTable()
         table.field_names = [
             "Cell",
-            *range(0, len(self.state_directions) + 1),
+            *range(1, len(self.state_directions) + 2),
         ]
         for i in range(self.grid_size**2):
             table.add_row([i + 1, *self.grid[i]])
+
+        with open("grid.txt", "w") as f:
+            f.writelines("Occupancy Grid\n")
+            f.write(str(table))
         print(table)
 
 
